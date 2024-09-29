@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
+    <title>Voice and Text Summarization Tool</title>
+</head>
+<body>
+    <div class="container">
+        <h1>Summarization Tool</h1>
+        <!-- Navigation Bar -->
+        <div class="navbar">
+            <button class="tab-button active" onclick="showTab('text')">Text Summarization</button>
+            <button class="tab-button" onclick="showTab('audio')">Audio Summarization</button>
+            <button class="tab-button" onclick="showTab('youtube')">YouTube Summarization</button> <!-- New YouTube Button -->
+        </div>
+
+        <!-- Text Summarization Section -->
+        <div id="text-tab" class="tab">
+            <h2>Text Input</h2>
+            <textarea id="text-input" placeholder="Enter text here..."></textarea>
+            <div class="button-container">
+                <button onclick="summarizeText()">Summarize Text</button>
+                <span id="text-progress" class="progress-text">0%</span>
+            </div>
+            <div id="text-summary" class="summary"></div>
+        </div>
+
+        <!-- Audio Summarization Section -->
+        <div id="audio-tab" class="tab" style="display:none;">
+            <h2>Audio Input</h2>
+            <div class="button-container">
+                <button id="record-button" onclick="toggleRecording()">Start Recording</button>
+                <button id="summarize-button" onclick="summarizeAudio()" disabled>Summarize</button>
+                <span id="audio-progress" class="progress-text">0%</span>
+            </div>
+            <div id="audio-summary" class="summary"></div>
+            <div id="progress-container" class="progress-container" style="display:none;">
+                <div id="progress-bar"></div>
+            </div>
+        </div>
+
+        <!-- YouTube Summarization Section -->
+        <div id="youtube-tab" class="tab" style="display:none;">
+            <h2>YouTube Video Link</h2>
+            <input type="text" id="youtube-input" placeholder="Enter YouTube link here..." />
+            <div class="button-container">
+                <button onclick="summarizeYoutube()">Summarize YouTube</button>
+                <span id="youtube-progress" class="progress-text">0%</span>
+            </div>
+            <div id="youtube-summary" class="summary"></div>
+        </div>
+    </div>
+
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let isRecording = false;
+
+        function showTab(tabName) {
+            const textTab = document.getElementById('text-tab');
+            const audioTab = document.getElementById('audio-tab');
+            const youtubeTab = document.getElementById('youtube-tab'); // YouTube tab
+            const tabButtons = document.querySelectorAll('.tab-button');
+
+            // Hide all tabs first
+            textTab.style.display = 'none';
+            audioTab.style.display = 'none';
+            youtubeTab.style.display = 'none';
+
+            // Show the selected tab
+            if (tabName === 'text') {
+                textTab.style.display = 'block';
+                tabButtons[0].classList.add('active');
+                tabButtons[1].classList.remove('active');
+                tabButtons[2].classList.remove('active');
+            } else if (tabName === 'audio') {
+                audioTab.style.display = 'block';
+                tabButtons[1].classList.add('active');
+                tabButtons[0].classList.remove('active');
+                tabButtons[2].classList.remove('active');
+            } else if (tabName === 'youtube') {
+                youtubeTab.style.display = 'block';
+                tabButtons[2].classList.add('active');
+                tabButtons[0].classList.remove('active');
+                tabButtons[1].classList.remove('active');
+            }
+        }
+
+        async function summarizeText() {
+            const textInput = document.getElementById('text-input').value;
+            const progressText = document.getElementById('text-progress');
+            let progress = 0;
+
+            // Start progress simulation
+            const progressInterval = setInterval(() => {
+                progress += Math.random() * 10;
+                if (progress > 90) {
+                    progress = 90;
+                    clearInterval(progressInterval);
+                }
+                progressText.innerText = Math.round(progress) + "%";
+            }, 300);
+
+            // Send text for summarization
+            const response = await fetch('/summarize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ text: textInput })
+            });
+
+            const data = await response.json();
+            document.getElementById('text-summary').innerText = data.summary || data.error;
+
+            // Clear interval and set to 100%
+            clearInterval(progressInterval);
+            progressText.innerText = "100%";
+        }
+
+        async function summarizeAudio(base64Audio) {
+            const progressBar = document.getElementById('progress-bar');
+            const progressText = document.getElementById('audio-progress');
+            let progress = 0;
+
+            document.getElementById('progress-container').style.display = 'block';
+
+            // Start progress simulation
+            const progressInterval = setInterval(() => {
+                progress += Math.random() * 10;
+                if (progress > 90) {
+                    progress = 90;
+                    clearInterval(progressInterval);
+                }
+                progressBar.style.width = progress + '%';
+                progressText.innerText = Math.round(progress) + "%";
+            }, 300);
+
+            // Send audio for summarization
+            const response = await fetch('/summarize', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ audio: base64Audio })
+            });
+
+            const data = await response.json();
+            document.getElementById('audio-summary').innerText = data.summary || data.error;
+
+            // Clear interval and set to 100%
+            clearInterval(progressInterval);
+            progressBar.style.width = '100%';
+            progressText.innerText = '100%';
+
+            // Hide progress container after a moment
+            setTimeout(() => {
+                document.getElementById('progress-container').style.display = 'none';
+            }, 1000);
+        }
+
+        async function summarizeYoutube() {
+            const youtubeInput = document.getElementById('youtube-input').value;
+            const progressText = document.getElementById('youtube-progress');
+            let progress = 0;
+
+            // Start progress simulation
+            const progressInterval = setInterval(() => {
+                progress += Math.random() * 10;
+                if (progress > 90) {
+                    progress = 90;
+                    clearInterval(progressInterval);
+                }
+                progressText.innerText = Math.round(progress) + "%";
+            }, 300);
+
+            // Send YouTube link for summarization
+            const response = await fetch('/summarize_youtube', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ link: youtubeInput })
+            });
+
+            const data = await response.json();
+            document.getElementById('youtube-summary').innerText = data.summary || data.error;
+
+            // Clear interval and set to 100%
+            clearInterval(progressInterval);
+            progressText.innerText = "100%";
+        }
+
+        // Show the text tab by default
+        showTab('text');
+    </script>
+
+</body>
+</html>
