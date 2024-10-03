@@ -1,0 +1,290 @@
+/* General Styles */
+body {
+    font-family: 'Roboto', sans-serif;
+    margin: 0;
+    padding: 0;
+    max-width: 1200px;
+    margin-left: auto;
+    margin-right: auto;
+    background-color: #f5f7fa;
+    color: #333;
+}
+
+/* Hidden Class */
+.hidden {
+    display: none;
+}
+
+/* Visually Hidden Class for Accessibility */
+.visually-hidden { 
+    position: absolute !important;
+    height: 1px; 
+    width: 1px; 
+    overflow: hidden;
+    clip: rect(1px, 1px, 1px, 1px); 
+    white-space: nowrap; 
+}
+
+/* Header Styles */
+header {
+    background-color: #4A90E2;
+    color: white;
+    padding: 20px;
+    text-align: center;
+}
+
+header h1 {
+    font-size: 36px;
+    margin: 0;
+    font-weight: 700;
+}
+
+/* Navigation Styles */
+nav {
+    display: flex;
+    justify-content: center;
+    background-color: #ffffff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+nav button {
+    flex: 1;
+    background-color: transparent;
+    color: #4A4A4A;
+    border: none;
+    padding: 15px;
+    cursor: pointer;
+    font-size: 18px;
+    transition: background-color 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+nav button i {
+    margin-right: 8px;
+}
+
+nav button:hover, nav button:focus {
+    background-color: #f0f0f0;
+    outline: none;
+}
+
+nav button.active {
+    border-bottom: 3px solid #4A90E2;
+    color: #4A90E2;
+    font-weight: bold;
+}
+
+/* Main Content Styles */
+main {
+    padding: 40px 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+/* Loading Spinner Styles */
+#loading-spinner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    font-size: 18px;
+    color: #4A90E2;
+}
+
+#loading-spinner i {
+    margin-right: 10px;
+}
+
+/* Input and Textarea Styles */
+textarea, input[type="text"], select {
+    width: 80%;
+    max-width: 600px;
+    height: 150px;
+    margin-bottom: 20px;
+    font-size: 16px;
+    padding: 15px;
+    border-radius: 8px;
+    border: 1px solid #ccc;
+    resize: vertical;
+    background-color: #fff;
+}
+
+textarea:focus, input[type="text"]:focus, select:focus {
+    outline: none;
+    border-color: #4A90E2;
+    box-shadow: 0 0 5px rgba(74, 144, 226, 0.5);
+}
+
+/* Button Styles */
+.record-btn, .action-btn {
+    background-color: #4A90E2;
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    margin-bottom: 20px;
+    cursor: pointer;
+    font-size: 18px;
+    border-radius: 50px;
+    transition: background-color 0.3s;
+}
+
+.record-btn:hover, .action-btn:hover,
+.record-btn:focus, .action-btn:focus {
+    background-color: #357ABD;
+    outline: none;
+}
+
+.record-btn i, .action-btn i {
+    margin-right: 8px;
+}
+
+/* Summary and Notes Styles */
+.summary, .notes, .sentiment {
+    width: 80%;
+    max-width: 800px;
+    background-color: #ffffff;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+    text-align: left;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.summary h3, .notes h3, .sentiment h3 {
+    margin-top: 0;
+}
+
+/* Transcript Styles */
+.transcript {
+    width: 80%;
+    max-width: 600px;
+    background-color: #e9f5ff;
+    border-left: 5px solid #4A90E2;
+    padding: 15px;
+    margin-bottom: 20px;
+    border-radius: 4px;
+    text-align: left;
+    font-style: italic;
+    color: #333;
+}
+
+/* Highlighted Information Styles */
+#highlight-container {
+    width: 80%;
+    max-width: 800px;
+    background-color: #fffbe6;
+    border-left: 5px solid #FFD700;
+    padding: 20px;
+    border-radius: 8px;
+    text-align: left;
+    margin-bottom: 20px;
+}
+
+.highlight {
+    background-color: #FFFF99;
+    font-weight: bold;
+}
+
+/* Status Messages */
+#speech-status-message, #text-status-message, #video-status-message {
+    font-size: 16px;
+    margin-bottom: 20px;
+    color: #4A4A4A;
+}
+
+/* Sentiment Analysis Styles */
+.sentiment {
+    background-color: #f0f8ff;
+    border-left: 5px solid #32CD32;
+}
+
+/* Footer Styles */
+footer {
+    background-color: #f5f7fa;
+    padding: 20px;
+    text-align: center;
+}
+
+footer button.theme-btn {
+    background-color: transparent;
+    color: #4A4A4A;
+    border: none;
+    cursor: pointer;
+    font-size: 16px;
+    margin-bottom: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+footer button.theme-btn i {
+    margin-right: 8px;
+}
+
+footer p {
+    margin: 0;
+    color: #9B9B9B;
+}
+
+/* Dark Theme Styles */
+.dark {
+    background-color: #1C1C1C;
+    color: #E0E0E0;
+}
+
+.dark header {
+    background-color: #333333;
+}
+
+.dark nav {
+    background-color: #2A2A2A;
+}
+
+.dark nav button {
+    color: #E0E0E0;
+}
+
+.dark nav button.active {
+    color: #FFD700;
+    border-bottom: 3px solid #FFD700;
+}
+
+.dark main {
+    background-color: #1C1C1C;
+}
+
+.dark textarea, .dark input[type="text"], .dark select {
+    background-color: #333333;
+    color: #E0E0E0;
+    border: 1px solid #555555;
+}
+
+.dark .record-btn, .dark .action-btn {
+    background-color: #FFD700;
+    color: #1C1C1C;
+}
+
+.dark .record-btn:hover, .dark .action-btn:hover,
+.dark .record-btn:focus, .dark .action-btn:focus {
+    background-color: #E0C200;
+    outline: none;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    nav button {
+        font-size: 16px;
+        padding: 10px;
+    }
+
+    textarea, input[type="text"], select {
+        width: 90%;
+    }
+
+    .summary, .notes, .sentiment, #highlight-container {
+        width: 90%;
+    }
+}

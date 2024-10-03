@@ -1,120 +1,220 @@
-from flask import Flask, request, jsonify, render_template
-from flask_cors import CORS
+import os
+import logging
 import base64
+import re
+from io import BytesIO
+
+from flask import Flask, request, jsonify
+from flask_cors import CORS
 import speech_recognition as sr
 from transformers import pipeline
-import yt_dlp
-import os
-from pydub import AudioSegment
+from youtube_transcript_api import YouTubeTranscriptApi, TranscriptsDisabled, NoTranscriptFound, VideoUnavailable
+import nltk
+from nltk.tokenize import sent_tokenize
+from textblob import TextBlob  # For sentiment analysis
+
+# Load environment variables
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Initialize logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.StreamHandler()
+    ]
+)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-CORS(app)
+
+# Configure CORS
+CORS_ORIGINS = os.getenv("CORS_ORIGINS", "*").split(",")
+CORS(app, resources={r"/summarize": {"origins": CORS_ORIGINS}})
 
 # Initialize the speech recognizer
 recognizer = sr.Recognizer()
-# Initialize the summarization pipeline for text
+
+# Initialize the summarization pipeline for English text
 summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+
+# Initialize sentiment analysis pipeline
+sentiment_analyzer = pipeline("sentiment-analysis")
+
+# Ensure NLTK data is available
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt')
+
 
 def summarize_text(text, chunk_size=1000):
     """Summarize the provided text using the summarization model."""
-    chunks = [text[i:i + chunk_size] for i in range(0, len(text), chunk_size)]
+    logger.info("Starting text summarization.")
+    sentences = sent_tokenize(text)
     summaries = []
-    for chunk in chunks:
-        print(f"Summarizing chunk: {chunk[:50]}...")  # Print the first 50 characters of the chunk
-        summary = summarizer(chunk, max_length=50, min_length=25, do_sample=False)
-        if summary:
-            summaries.append(summary[0]['summary_text'])
-    combined_summary = " ".join(summaries)
-    print(f"Combined summary: {combined_summary[:100]}...")  # Print the first 100 characters of the combined summary
-    return combined_summary
+    current_chunk = ""
+    
+    for sentence in sentences:
+        if len(current_chunk) + len(sentence) + 1 < chunk_size:
+            current_chunk += " " + sentence
+        else:
+            summaries.append(current_chunk.strip())
+            current_chunk = sentence
+    
+    if current_chunk:
+        summaries.append(current_chunk.strip())
+    
+    final_summary = ""
+    for chunk in summaries:
+        try:
+            summary = summarizer(chunk, max_length=130, min_length=30, do_sample=False)
+            final_summary += summary[0]['summary_text'] + " "
+        except Exception as e:
+            logger.error(f"Error during summarization: {e}")
+    
+    logger.info("Text summarization completed.")
+    return final_summary.strip()
 
-def ensure_wav_format(audio_file):
-    """Convert audio file to .wav format if necessary."""
-    if not audio_file.endswith('.wav'):
-        print(f"Converting {audio_file} to .wav format")
-        sound = AudioSegment.from_file(audio_file)
-        wav_file = audio_file.rsplit('.', 1)[0] + '.wav'
-        sound.export(wav_file, format='wav')
-        print(f"Exported to {wav_file}")
-        return wav_file
-    return audio_file
 
-def transcribe_audio(audio_data):
-    """Transcribe the audio data to text."""
-    print(f"Transcribing audio data: {audio_data}")
-    audio_file = sr.AudioFile(audio_data)
-    with audio_file as source:
+def generate_notes(text, num_ideas=5):
+    """Generate key ideas from the summarized text."""
+    logger.info("Generating key ideas from summary.")
+    try:
+        blob = TextBlob(text)
+        sentences = blob.sentences
+        key_ideas = [str(sentence) for sentence in sentences[:num_ideas]]
+        logger.info("Key ideas generation completed.")
+        return key_ideas
+    except Exception as e:
+        logger.error(f"Error during key ideas generation: {e}")
+        return []
+
+
+def analyze_sentiment(text):
+    """Analyze sentiment of the provided text."""
+    logger.info("Starting sentiment analysis.")
+    try:
+        sentiment = sentiment_analyzer(text)
+        logger.info("Sentiment analysis completed.")
+        return sentiment
+    except Exception as e:
+        logger.error(f"Error in sentiment analysis: {e}")
+        return [{"label": "Neutral", "score": 0.0}]
+
+
+def summarize_speech(audio_data):
+    """Summarize the provided audio data."""
+    logger.info("Starting speech summarization.")
+    audio_buffer = BytesIO(audio_data)
+    with sr.AudioFile(audio_buffer) as source:
         audio = recognizer.record(source)
-    print("Audio recorded, recognizing...")
-    return recognizer.recognize_google(audio)
+    try:
+        text = recognizer.recognize_google(audio)
+        logger.info("Speech recognized successfully.")
+        summary = summarize_text(text)
+        notes = generate_notes(summary)
+        sentiment = analyze_sentiment(summary)
+        return summary, notes, sentiment
+    except sr.UnknownValueError:
+        logger.warning("Speech Recognition could not understand the audio.")
+        return "Sorry, I could not understand the audio.", [], []
+    except sr.RequestError as e:
+        logger.error(f"Could not request results from Speech Recognition service; {e}")
+        return f"Could not request results from Speech Recognition service; {e}", [], []
 
-def download_and_transcribe_youtube(link):
-    """Download YouTube video and transcribe the audio."""
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'extractaudio': True,
-        'outtmpl': '%(id)s.%(ext)s',
-    }
 
-    print(f"Downloading YouTube video: {link}")
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        info = ydl.extract_info(link, download=True)
-        audio_file = ydl.prepare_filename(info).rsplit('.', 1)[0] + '.wav'
+def extract_video_id(youtube_url):
+    """Extract the video ID from the YouTube URL."""
+    logger.info(f"Extracting video ID from URL: {youtube_url}")
+    regex_patterns = [
+        r'(?:v=|\/)([0-9A-Za-z_-]{11}).*',
+        r'youtu\.be\/([0-9A-Za-z_-]{11}).*',
+        r'embed\/([0-9A-Za-z_-]{11}).*',
+        r'watch\?v=([0-9A-Za-z_-]{11}).*',
+    ]
+    for pattern in regex_patterns:
+        match = re.search(pattern, youtube_url)
+        if match:
+            video_id = match.group(1)
+            logger.info(f"Extracted Video ID: {video_id}")
+            return video_id
+    logger.error("Invalid YouTube URL provided.")
+    raise ValueError("Invalid YouTube URL")
 
-    print(f"Downloaded audio file: {audio_file}")
-
-    # Ensure the file exists and is not empty
-    if os.path.exists(audio_file):
-        print(f"Found audio file: {audio_file}, size: {os.path.getsize(audio_file)} bytes")
-
-        # Ensure the file is in wav format
-        audio_file = ensure_wav_format(audio_file)
-
-        with sr.AudioFile(audio_file) as source:
-            audio = recognizer.record(source)
-            print("Audio recorded for transcription.")
-            return recognizer.recognize_google(audio)
-    else:
-        raise FileNotFoundError(f"Audio file {audio_file} not found.")
-
-@app.route('/')
-def home():
-    """Serve the home page with input options."""
-    return render_template('index.html')
 
 @app.route('/summarize', methods=['POST'])
 def summarize():
-    """Endpoint for text and audio summarization."""
-    data = request.get_json()
-    print(f"Received data for summarization: {data}")
-    if 'text' in data:
-        summary = summarize_text(data['text'])
-        return jsonify({'summary': summary})
-    elif 'audio' in data:
-        audio_data = base64.b64decode(data['audio'])
-        with open('temp_audio.wav', 'wb') as f:
-            f.write(audio_data)
-        print("Temporary audio file created for transcription.")
-        transcript = transcribe_audio('temp_audio.wav')
-        summary = summarize_text(transcript)
-        return jsonify({'summary': summary})
-    return jsonify({'error': 'No valid input provided.'})
+    logger.info("Received summarization request.")
+    try:
+        data = request.get_json()
+        if not data:
+            logger.warning("No JSON data provided in the request.")
+            return jsonify(error="No data provided."), 400
 
-@app.route('/summarize_youtube', methods=['POST'])
-def summarize_youtube():
-    """Endpoint for summarizing a YouTube video."""
-    data = request.get_json()
-    print(f"Received data for YouTube summarization: {data}")
-    if 'link' in data:
-        try:
-            transcript = download_and_transcribe_youtube(data['link'])
-            print(f"Transcription completed: {transcript[:100]}...")  # Print the first 100 characters of the transcript
-            summary = summarize_text(transcript)
-            return jsonify({'summary': summary})
-        except Exception as e:
-            print(f"Error during transcription: {str(e)}")
-            return jsonify({'error': str(e)})
-    return jsonify({'error': 'No valid YouTube link provided.'})
+        if 'text' in data:
+            logger.info("Processing text input for summarization.")
+            text = data['text']
+            summary = summarize_text(text)
+            notes = generate_notes(summary)
+            sentiment = analyze_sentiment(summary)
+            return jsonify(summary=summary, notes=notes, sentiment=sentiment)
+
+        elif 'audio' in data:
+            logger.info("Processing audio input for summarization.")
+            audio_base64 = data['audio']
+            try:
+                audio_data = base64.b64decode(audio_base64)
+            except base64.binascii.Error as e:
+                logger.error(f"Invalid audio data: {e}")
+                return jsonify(error="Invalid audio data."), 400
+            summary, notes, sentiment = summarize_speech(audio_data)
+            return jsonify(summary=summary, notes=notes, sentiment=sentiment)
+
+        elif 'youtube_url' in data:
+            logger.info("Processing YouTube URL for summarization.")
+            youtube_url = data['youtube_url']
+            try:
+                video_id = extract_video_id(youtube_url)
+                transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+                transcript = transcript_list.find_transcript(['en'])
+                transcript_data = transcript.fetch()
+                text = ' '.join([t['text'] for t in transcript_data])
+                summary = summarize_text(text)
+                notes = generate_notes(summary)
+                sentiment = analyze_sentiment(summary)
+                return jsonify(summary=summary, notes=notes, sentiment=sentiment)
+            except VideoUnavailable:
+                logger.error("The YouTube video is unavailable.")
+                return jsonify(error="The YouTube video is unavailable."), 400
+            except TranscriptsDisabled:
+                logger.error("Transcripts are disabled for this YouTube video.")
+                return jsonify(error="Transcripts are disabled for this YouTube video."), 400
+            except NoTranscriptFound:
+                logger.error("No transcript found for the provided YouTube video.")
+                return jsonify(error="No transcript found for the provided YouTube video."), 400
+            except Exception as e:
+                logger.error(f"Error processing YouTube video: {e}")
+                return jsonify(error=f"Error processing YouTube video: {str(e)}"), 400
+
+        else:
+            logger.warning("Invalid input provided.")
+            return jsonify(error="Invalid input. Please provide text, audio, or a YouTube URL."), 400
+
+    except Exception as e:
+        logger.exception(f"An unexpected error occurred: {e}")
+        return jsonify(error=f"An unexpected error occurred: {str(e)}"), 500
+
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # Use environment variables for host and port if needed
+    HOST = os.getenv("FLASK_HOST", "0.0.0.0")
+    PORT = int(os.getenv("FLASK_PORT", 5000))
+    debug_mode = os.getenv("FLASK_DEBUG", "False").lower() in ['true', '1', 't']
+    try:
+        app.run(host=HOST, port=PORT, debug=debug_mode)
+    except Exception as e:
+        logger.exception(f"Failed to start the Flask app: {e}")
+        exit(1)
